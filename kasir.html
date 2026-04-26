@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistem Manajemen Barang</title>
+    <style>
+        :root {
+            --primary: #2c3e50;
+            --secondary: #34495e;
+            --accent: #3498db;
+            --danger: #e74c3c;
+            --success: #2ecc71;
+            --text: #ffffff;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            background-color: #f4f7f6;
+        }
+
+        .hidden { display: none !important; }
+
+        /* Login & Sign Up Style */
+        .auth-container {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+        }
+        .auth-card {
+            background: white;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+            width: 350px;
+            text-align: center;
+        }
+        input {
+            width: 100%;
+            padding: 12px;
+            margin: 10px 0;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            box-sizing: border-box;
+        }
+        button {
+            width: 100%;
+            padding: 12px;
+            cursor: pointer;
+            border: none;
+            border-radius: 6px;
+            transition: 0.3s;
+        }
+        .btn-primary { background: var(--accent); color: white; }
+        .btn-primary:hover { background: #2980b9; }
+
+        /* Dashboard Layout */
+        #dashboard { display: flex; height: 100vh; }
+
+        /* Sidebar */
+        .sidebar {
+            width: 250px;
+            background: var(--primary);
+            color: var(--text);
+            padding: 20px 0;
+            display: flex;
+            flex-direction: column;
+        }
+        .sidebar h2 { text-align: center; margin-bottom: 30px; font-size: 1.2rem; }
+        .nav-item {
+            padding: 15px 25px;
+            cursor: pointer;
+            transition: 0.3s;
+        }
+        .nav-item:hover, .nav-item.active { background: var(--secondary); border-left: 4px solid var(--accent); }
+        .logout-btn { margin-top: auto; background: var(--danger); }
+
+        /* Main Content */
+        .content { flex: 1; padding: 30px; overflow-y: auto; }
+        .card { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
+
+        /* Table Style */
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+        th, td { padding: 12px; text-align: left; border-bottom: 1px solid #eee; }
+        th { background: #f8f9fa; }
+
+        /* Katalog & Item List */
+        .item-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 20px; }
+        .product-card { background: white; padding: 15px; border-radius: 8px; border: 1px solid #ddd; text-align: center; }
+        .qty-input { width: 60px; text-align: center; margin: 5px; }
+    </style>
+</head>
+<body>
+
+    <div id="auth-page" class="auth-container">
+        <div id="login-box" class="auth-card">
+            <h2>Masuk</h2>
+            <input type="text" id="login-user" placeholder="Username">
+            <input type="password" id="login-pass" placeholder="Password">
+            <button class="btn-primary" onclick="handleLogin()">Login</button>
+            <p>Belum punya akun? <a href="#" onclick="toggleAuth()">Daftar</a></p>
+        </div>
+        <div id="signup-box" class="auth-card hidden">
+            <h2>Daftar Baru</h2>
+            <input type="text" id="reg-user" placeholder="Buat Username">
+            <input type="password" id="reg-pass" placeholder="Buat Password">
+            <button class="btn-primary" onclick="handleSignUp()">Sign Up</button>
+            <p>Sudah punya akun? <a href="#" onclick="toggleAuth()">Login</a></p>
+        </div>
+    </div>
+
+    <div id="dashboard" class="hidden">
+        <div class="sidebar">
+            <h2>Sistem Penjualan</h2>
+            <div class="nav-item active" onclick="showTab('katalog')">Katalog Item</div>
+            <div class="nav-item" onclick="showTab('daftar-barang')">Daftar Barang (Order)</div>
+            <div class="nav-item" onclick="showTab('hasil-penjualan')">Hasil Penjualan</div>
+            <button class="logout-btn" onclick="location.reload()">Logout</button>
+        </div>
+
+        <div class="content">
+            <div id="tab-katalog" class="tab-content">
+                <div class="card">
+                    <h3>Tambah/Edit Katalog</h3>
+                    <div style="display: flex; gap: 10px;">
+                        <input type="text" id="item-name" placeholder="Nama Item">
+                        <input type="number" id="item-price" placeholder="Harga">
+                        <button class="btn-primary" style="width: auto;" onclick="addOrUpdateItem()">Simpan Item</button>
+                    </div>
+                    <table id="katalog-table">
+                        <thead>
+                            <tr>
+                                <th>Nama Item</th>
+                                <th>Harga</th>
+                                <th>Aksi</th>
+                            </tr>
+                        </thead>
+                        <tbody id="katalog-body"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div id="tab-daftar-barang" class="tab-content hidden">
+                <h3>Pilih Barang untuk Order</h3>
+                <div id="order-grid" class="item-grid"></div>
+            </div>
+
+            <div id="tab-hasil-penjualan" class="tab-content hidden">
+                <div class="card">
+                    <h3>Rekap Penjualan</h3>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Waktu</th>
+                                <th>Detail Order</th>
+                                <th>Total Bayar</th>
+                            </tr>
+                        </thead>
+                        <tbody id="sales-body"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Data State
+        let users = [{ user: "admin", pass: "123" }];
+        let katalog = [
+            { id: 1, name: "Kopi Hitam", price: 15000 },
+            { id: 2, name: "Teh Manis", price: 5000 }
+        ];
+        let sales = [];
+        let editId = null;
+
+        // --- Autentikasi ---
+        function toggleAuth() {
+            document.getElementById('login-box').classList.toggle('hidden');
+            document.getElementById('signup-box').classList.toggle('hidden');
+        }
+
+        function handleSignUp() {
+            const u = document.getElementById('reg-user').value;
+            const p = document.getElementById('reg-pass').value;
+            if(u && p) {
+                users.push({user: u, pass: p});
+                alert("Berhasil daftar!");
+                toggleAuth();
+            }
+        }
+
+        function handleLogin() {
+            const u = document.getElementById('login-user').value;
+            const p = document.getElementById('login-pass').value;
+            const found = users.find(x => x.user === u && x.pass === p);
+            if(found) {
+                document.getElementById('auth-page').classList.add('hidden');
+                document.getElementById('dashboard').classList.remove('hidden');
+                renderKatalog();
+            } else {
+                alert("Login gagal!");
+            }
+        }
+
+        // --- Navigasi Tab ---
+        function showTab(tabName) {
+            document.querySelectorAll('.tab-content').forEach(t => t.classList.add('hidden'));
+            document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+            
+            document.getElementById('tab-' + tabName).classList.remove('hidden');
+            event.currentTarget.classList.add('active');
+
+            if(tabName === 'daftar-barang') renderOrderGrid();
+            if(tabName === 'hasil-penjualan') renderSales();
+        }
+
+        // --- Manajemen Katalog ---
+        function renderKatalog() {
+            const body = document.getElementById('katalog-body');
+            body.innerHTML = "";
+            katalog.forEach(item => {
+                body.innerHTML += `
+                    <tr>
+                        <td>${item.name}</td>
+                        <td>Rp ${item.price.toLocaleString()}</td>
+                        <td>
+                            <button onclick="editItem(${item.id})" style="width:auto; background:#f39c12; color:white">Edit</button>
+                            <button onclick="deleteItem(${item.id})" style="width:auto; background:var(--danger); color:white">Hapus</button>
+                        </td>
+                    </tr>
+                `;
+            });
+        }
+
+        function addOrUpdateItem() {
+            const name = document.getElementById('item-name').value;
+            const price = parseInt(document.getElementById('item-price').value);
+            
+            if(!name || !price) return alert("Isi data!");
+
+            if(editId) {
+                const idx = katalog.findIndex(x => x.id === editId);
+                katalog[idx] = { id: editId, name, price };
+                editId = null;
+            } else {
+                katalog.push({ id: Date.now(), name, price });
+            }
+
+            document.getElementById('item-name').value = "";
+            document.getElementById('item-price').value = "";
+            renderKatalog();
+        }
+
+        function deleteItem(id) {
+            katalog = katalog.filter(x => x.id !== id);
+            renderKatalog();
+        }
+
+        function editItem(id) {
+            const item = katalog.find(x => x.id === id);
+            document.getElementById('item-name').value = item.name;
+            document.getElementById('item-price').value = item.price;
+            editId = id;
+        }
+
+        // --- Sistem Order & Penjualan ---
+        function renderOrderGrid() {
+            const grid = document.getElementById('order-grid');
+            grid.innerHTML = "";
+            katalog.forEach(item => {
+                grid.innerHTML += `
+                    <div class="product-card">
+                        <h4>${item.name}</h4>
+                        <p>Rp ${item.price.toLocaleString()}</p>
+                        <input type="number" id="qty-${item.id}" value="1" min="1" class="qty-input">
+                        <button class="btn-primary" onclick="processOrder(${item.id})">Order</button>
+                    </div>
+                `;
+            });
+        }
+
+        function processOrder(id) {
+            const item = katalog.find(x => x.id === id);
+            const qty = parseInt(document.getElementById('qty-'+id).value);
+            const total = item.price * qty;
+
+            sales.push({
+                time: new Date().toLocaleString(),
+                detail: `${item.name} (${qty}x)`,
+                total: total
+            });
+
+            alert(`Order ${item.name} berhasil!`);
+        }
+
+        function renderSales() {
+            const body = document.getElementById('sales-body');
+            body.innerHTML = "";
+            sales.forEach(s => {
+                body.innerHTML += `
+                    <tr>
+                        <td>${s.time}</td>
+                        <td>${s.detail}</td>
+                        <td>Rp ${s.total.toLocaleString()}</td>
+                    </tr>
+                `;
+            });
+        }
+    </script>
+</body>
+</html>
