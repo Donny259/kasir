@@ -55,6 +55,7 @@
         }
         .btn-primary { background: var(--accent); color: white; }
         .btn-primary:hover { background: #2980b9; }
+        .btn-link { background: none; color: var(--accent); padding: 5px; font-size: 0.9em; }
 
         /* Dashboard Layout */
         #dashboard { display: flex; height: 100vh; }
@@ -75,7 +76,7 @@
             transition: 0.3s;
         }
         .nav-item:hover, .nav-item.active { background: var(--secondary); border-left: 4px solid var(--accent); }
-        .logout-btn { margin-top: auto; background: var(--danger); }
+        .logout-btn { margin-top: auto; background: var(--danger); color: white; }
 
         /* Main Content */
         .content { flex: 1; padding: 30px; overflow-y: auto; }
@@ -97,14 +98,15 @@
     <div id="auth-page" class="auth-container">
         <div id="login-box" class="auth-card">
             <h2>Masuk</h2>
-            <input type="text" id="login-user" placeholder="Username">
+            <input type="email" id="login-user" placeholder="Email (Gmail)">
             <input type="password" id="login-pass" placeholder="Password">
             <button class="btn-primary" onclick="handleLogin()">Login</button>
+            <button class="btn-link" onclick="handleResetPassword()">Lupa Password?</button>
             <p>Belum punya akun? <a href="#" onclick="toggleAuth()">Daftar</a></p>
         </div>
         <div id="signup-box" class="auth-card hidden">
             <h2>Daftar Baru</h2>
-            <input type="text" id="reg-user" placeholder="Buat Username">
+            <input type="email" id="reg-user" placeholder="Email (Gmail)">
             <input type="password" id="reg-pass" placeholder="Buat Password">
             <button class="btn-primary" onclick="handleSignUp()">Sign Up</button>
             <p>Sudah punya akun? <a href="#" onclick="toggleAuth()">Login</a></p>
@@ -117,7 +119,7 @@
             <div class="nav-item active" onclick="showTab('katalog')">Katalog Item</div>
             <div class="nav-item" onclick="showTab('daftar-barang')">Daftar Barang (Order)</div>
             <div class="nav-item" onclick="showTab('hasil-penjualan')">Hasil Penjualan</div>
-            <button class="logout-btn" onclick="location.reload()">Logout</button>
+            <button class="logout-btn" onclick="handleLogout()">Logout</button>
         </div>
 
         <div class="content">
@@ -165,58 +167,121 @@
         </div>
     </div>
 
-    <script>
-        // Data State
-        let users = [{ user: "admin", pass: "123" }];
-        let katalog = [
-            { id: 1, name: "Kopi Hitam", price: 15000 },
-            { id: 2, name: "Teh Manis", price: 5000 }
-        ];
-        let sales = [];
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+        import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, sendPasswordResetEmail, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+        import { getDatabase, ref, set, push, onValue, remove, update } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyBZU6qgOcXF5tRRmb41-WXdeQptMVfTPCU",
+            authDomain: "kasir-d6127.firebaseapp.com",
+            projectId: "kasir-d6127",
+            storageBucket: "kasir-d6127.firebasestorage.app",
+            messagingSenderId: "190173543746",
+            appId: "1:190173543746:web:266a2e79c9fb5223af1cdb",
+            measurementId: "G-SNZYCMGV52"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getDatabase(app);
+
+        let katalog = [];
         let editId = null;
 
-        // --- Autentikasi ---
-        function toggleAuth() {
+        // --- Autentikasi (Global) ---
+        window.toggleAuth = () => {
             document.getElementById('login-box').classList.toggle('hidden');
             document.getElementById('signup-box').classList.toggle('hidden');
-        }
+        };
 
-        function handleSignUp() {
-            const u = document.getElementById('reg-user').value;
-            const p = document.getElementById('reg-pass').value;
-            if(u && p) {
-                users.push({user: u, pass: p});
+        window.handleSignUp = async () => {
+            const email = document.getElementById('reg-user').value;
+            const pass = document.getElementById('reg-pass').value;
+            try {
+                await createUserWithEmailAndPassword(auth, email, pass);
                 alert("Berhasil daftar!");
-                toggleAuth();
-            }
-        }
+                window.toggleAuth();
+            } catch (error) { alert("Gagal daftar: " + error.message); }
+        };
 
-        function handleLogin() {
-            const u = document.getElementById('login-user').value;
-            const p = document.getElementById('login-pass').value;
-            const found = users.find(x => x.user === u && x.pass === p);
-            if(found) {
-                document.getElementById('auth-page').classList.add('hidden');
-                document.getElementById('dashboard').classList.remove('hidden');
-                renderKatalog();
-            } else {
-                alert("Login gagal!");
-            }
-        }
+        window.handleLogin = async () => {
+            const email = document.getElementById('login-user').value;
+            const pass = document.getElementById('login-pass').value;
+            try {
+                await signInWithEmailAndPassword(auth, email, pass);
+            } catch (error) { alert("Login gagal: " + error.message); }
+        };
 
-        // --- Navigasi Tab ---
-        function showTab(tabName) {
+        window.handleLogout = () => {
+            signOut(auth).then(() => location.reload());
+        };
+
+        window.handleResetPassword = async () => {
+            const email = document.getElementById('login-user').value;
+            if(!email) return alert("Masukkan email Anda terlebih dahulu.");
+            try {
+                await sendPasswordResetEmail(auth, email);
+                alert("Email reset password telah dikirim!");
+            } catch (error) { alert("Gagal: " + error.message); }
+        };
+
+        // --- Dashboard & Tabs (Global) ---
+        window.showTab = (tabName) => {
             document.querySelectorAll('.tab-content').forEach(t => t.classList.add('hidden'));
             document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
-            
             document.getElementById('tab-' + tabName).classList.remove('hidden');
-            event.currentTarget.classList.add('active');
+            if (event) event.currentTarget.classList.add('active');
+        };
 
-            if(tabName === 'daftar-barang') renderOrderGrid();
-            if(tabName === 'hasil-penjualan') renderSales();
-        }
+        // --- Katalog Logic (Global) ---
+        window.addOrUpdateItem = async () => {
+            const name = document.getElementById('item-name').value;
+            const price = parseInt(document.getElementById('item-price').value);
+            if(!name || !price) return alert("Isi data!");
 
-        // --- Manajemen Katalog ---
+            try {
+                if(editId) {
+                    await update(ref(db, 'katalog/' + editId), { name, price });
+                    editId = null;
+                } else {
+                    const newRef = push(ref(db, 'katalog'));
+                    await set(newRef, { name, price });
+                }
+                document.getElementById('item-name').value = "";
+                document.getElementById('item-price').value = "";
+            } catch (e) { alert("Gagal menyimpan: " + e.message); }
+        };
+
+        window.editItem = (id) => {
+            const item = katalog.find(x => x.id === id);
+            document.getElementById('item-name').value = item.name;
+            document.getElementById('item-price').value = item.price;
+            editId = id;
+            window.scrollTo(0, 0);
+        };
+
+        window.deleteItem = (id) => {
+            if(confirm("Hapus item ini?")) remove(ref(db, 'katalog/' + id));
+        };
+
+        window.processOrder = async (id) => {
+            const item = katalog.find(x => x.id === id);
+            const qtyInput = document.getElementById('qty-'+id);
+            const qty = parseInt(qtyInput.value);
+            const total = item.price * qty;
+
+            try {
+                await push(ref(db, 'sales'), {
+                    time: new Date().toLocaleString(),
+                    detail: `${item.name} (${qty}x)`,
+                    total: total
+                });
+                alert(`Order ${item.name} berhasil!`);
+            } catch (e) { alert("Gagal order: " + e.message); }
+        };
+
+        // --- Render UI Functions ---
         function renderKatalog() {
             const body = document.getElementById('katalog-body');
             body.innerHTML = "";
@@ -226,46 +291,13 @@
                         <td>${item.name}</td>
                         <td>Rp ${item.price.toLocaleString()}</td>
                         <td>
-                            <button onclick="editItem(${item.id})" style="width:auto; background:#f39c12; color:white">Edit</button>
-                            <button onclick="deleteItem(${item.id})" style="width:auto; background:var(--danger); color:white">Hapus</button>
+                            <button onclick="editItem('${item.id}')" style="width:auto; background:#f39c12; color:white">Edit</button>
+                            <button onclick="deleteItem('${item.id}')" style="width:auto; background:var(--danger); color:white">Hapus</button>
                         </td>
-                    </tr>
-                `;
+                    </tr>`;
             });
         }
 
-        function addOrUpdateItem() {
-            const name = document.getElementById('item-name').value;
-            const price = parseInt(document.getElementById('item-price').value);
-            
-            if(!name || !price) return alert("Isi data!");
-
-            if(editId) {
-                const idx = katalog.findIndex(x => x.id === editId);
-                katalog[idx] = { id: editId, name, price };
-                editId = null;
-            } else {
-                katalog.push({ id: Date.now(), name, price });
-            }
-
-            document.getElementById('item-name').value = "";
-            document.getElementById('item-price').value = "";
-            renderKatalog();
-        }
-
-        function deleteItem(id) {
-            katalog = katalog.filter(x => x.id !== id);
-            renderKatalog();
-        }
-
-        function editItem(id) {
-            const item = katalog.find(x => x.id === id);
-            document.getElementById('item-name').value = item.name;
-            document.getElementById('item-price').value = item.price;
-            editId = id;
-        }
-
-        // --- Sistem Order & Penjualan ---
         function renderOrderGrid() {
             const grid = document.getElementById('order-grid');
             grid.innerHTML = "";
@@ -275,39 +307,41 @@
                         <h4>${item.name}</h4>
                         <p>Rp ${item.price.toLocaleString()}</p>
                         <input type="number" id="qty-${item.id}" value="1" min="1" class="qty-input">
-                        <button class="btn-primary" onclick="processOrder(${item.id})">Order</button>
-                    </div>
-                `;
+                        <button class="btn-primary" onclick="processOrder('${item.id}')">Order</button>
+                    </div>`;
             });
         }
 
-        function processOrder(id) {
-            const item = katalog.find(x => x.id === id);
-            const qty = parseInt(document.getElementById('qty-'+id).value);
-            const total = item.price * qty;
+        // --- Realtime Sync & Auth Observer ---
+        onAuthStateChanged(auth, (user) => {
+            if (user) {
+                document.getElementById('auth-page').classList.add('hidden');
+                document.getElementById('dashboard').classList.remove('hidden');
+                
+                // Sync Katalog
+                onValue(ref(db, 'katalog'), (snapshot) => {
+                    const data = snapshot.val();
+                    katalog = data ? Object.keys(data).map(key => ({ id: key, ...data[key] })) : [];
+                    renderKatalog();
+                    renderOrderGrid();
+                });
 
-            sales.push({
-                time: new Date().toLocaleString(),
-                detail: `${item.name} (${qty}x)`,
-                total: total
-            });
-
-            alert(`Order ${item.name} berhasil!`);
-        }
-
-        function renderSales() {
-            const body = document.getElementById('sales-body');
-            body.innerHTML = "";
-            sales.forEach(s => {
-                body.innerHTML += `
-                    <tr>
-                        <td>${s.time}</td>
-                        <td>${s.detail}</td>
-                        <td>Rp ${s.total.toLocaleString()}</td>
-                    </tr>
-                `;
-            });
-        }
+                // Sync Sales
+                onValue(ref(db, 'sales'), (snapshot) => {
+                    const data = snapshot.val();
+                    const salesBody = document.getElementById('sales-body');
+                    salesBody.innerHTML = "";
+                    if(data) {
+                        Object.values(data).reverse().forEach(s => {
+                            salesBody.innerHTML += `<tr><td>${s.time}</td><td>${s.detail}</td><td>Rp ${s.total.toLocaleString()}</td></tr>`;
+                        });
+                    }
+                });
+            } else {
+                document.getElementById('auth-page').classList.remove('hidden');
+                document.getElementById('dashboard').classList.add('hidden');
+            }
+        });
     </script>
 </body>
 </html>
