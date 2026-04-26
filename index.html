@@ -22,7 +22,6 @@
 
         .hidden { display: none !important; }
 
-        /* Login & Sign Up Style */
         .auth-container {
             display: flex;
             justify-content: center;
@@ -57,10 +56,8 @@
         .btn-primary:hover { background: #2980b9; }
         .btn-link { background: none; color: var(--accent); padding: 5px; font-size: 0.9em; }
 
-        /* Dashboard Layout */
         #dashboard { display: flex; height: 100vh; }
 
-        /* Sidebar */
         .sidebar {
             width: 250px;
             background: var(--primary);
@@ -78,16 +75,13 @@
         .nav-item:hover, .nav-item.active { background: var(--secondary); border-left: 4px solid var(--accent); }
         .logout-btn { margin-top: auto; background: var(--danger); color: white; }
 
-        /* Main Content */
         .content { flex: 1; padding: 30px; overflow-y: auto; }
         .card { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
 
-        /* Table Style */
         table { width: 100%; border-collapse: collapse; margin-top: 20px; }
         th, td { padding: 12px; text-align: left; border-bottom: 1px solid #eee; }
         th { background: #f8f9fa; }
 
-        /* Katalog & Item List */
         .item-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 20px; }
         .product-card { background: white; padding: 15px; border-radius: 8px; border: 1px solid #ddd; text-align: center; }
         .qty-input { width: 60px; text-align: center; margin: 5px; }
@@ -116,9 +110,9 @@
     <div id="dashboard" class="hidden">
         <div class="sidebar">
             <h2>Sistem Penjualan</h2>
-            <div class="nav-item active" onclick="showTab('katalog')">Katalog Item</div>
-            <div class="nav-item" onclick="showTab('daftar-barang')">Daftar Barang (Order)</div>
-            <div class="nav-item" onclick="showTab('hasil-penjualan')">Hasil Penjualan</div>
+            <div class="nav-item active" onclick="showTab(event, 'katalog')">Katalog Item</div>
+            <div class="nav-item" onclick="showTab(event, 'daftar-barang')">Daftar Barang (Order)</div>
+            <div class="nav-item" onclick="showTab(event, 'hasil-penjualan')">Hasil Penjualan</div>
             <button class="logout-btn" onclick="handleLogout()">Logout</button>
         </div>
 
@@ -175,6 +169,8 @@
         const firebaseConfig = {
             apiKey: "AIzaSyBZU6qgOcXF5tRRmb41-WXdeQptMVfTPCU",
             authDomain: "kasir-d6127.firebaseapp.com",
+            // INI YANG TADI SALAH: Harus ada databaseURL karena server lo di Singapore
+            databaseURL: "https://kasir-d6127-default-rtdb.asia-southeast1.firebasedatabase.app",
             projectId: "kasir-d6127",
             storageBucket: "kasir-d6127.firebasestorage.app",
             messagingSenderId: "190173543746",
@@ -189,7 +185,7 @@
         let katalog = [];
         let editId = null;
 
-        // --- Autentikasi (Global) ---
+        // --- Auth Functions ---
         window.toggleAuth = () => {
             document.getElementById('login-box').classList.toggle('hidden');
             document.getElementById('signup-box').classList.toggle('hidden');
@@ -202,7 +198,7 @@
                 await createUserWithEmailAndPassword(auth, email, pass);
                 alert("Berhasil daftar!");
                 window.toggleAuth();
-            } catch (error) { alert("Gagal daftar: " + error.message); }
+            } catch (error) { alert(error.message); }
         };
 
         window.handleLogin = async () => {
@@ -219,38 +215,40 @@
 
         window.handleResetPassword = async () => {
             const email = document.getElementById('login-user').value;
-            if(!email) return alert("Masukkan email Anda terlebih dahulu.");
+            if(!email) return alert("Masukkan email Anda.");
             try {
                 await sendPasswordResetEmail(auth, email);
-                alert("Email reset password telah dikirim!");
-            } catch (error) { alert("Gagal: " + error.message); }
+                alert("Email reset terkirim!");
+            } catch (error) { alert(error.message); }
         };
 
-        // --- Dashboard & Tabs (Global) ---
-        window.showTab = (tabName) => {
+        window.showTab = (e, tabName) => {
             document.querySelectorAll('.tab-content').forEach(t => t.classList.add('hidden'));
             document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
             document.getElementById('tab-' + tabName).classList.remove('hidden');
-            if (event) event.currentTarget.classList.add('active');
+            if (e) e.currentTarget.classList.add('active');
         };
 
-        // --- Katalog Logic (Global) ---
+        // --- Core Logic ---
         window.addOrUpdateItem = async () => {
             const name = document.getElementById('item-name').value;
-            const price = parseInt(document.getElementById('item-price').value);
-            if(!name || !price) return alert("Isi data!");
+            const priceVal = document.getElementById('item-price').value;
+            if(!name || !priceVal) return alert("Isi data!");
+            const price = parseInt(priceVal);
 
             try {
                 if(editId) {
                     await update(ref(db, 'katalog/' + editId), { name, price });
                     editId = null;
+                    alert("Update Berhasil!");
                 } else {
                     const newRef = push(ref(db, 'katalog'));
                     await set(newRef, { name, price });
+                    alert("Simpan Berhasil!");
                 }
                 document.getElementById('item-name').value = "";
                 document.getElementById('item-price').value = "";
-            } catch (e) { alert("Gagal menyimpan: " + e.message); }
+            } catch (e) { alert("Error: " + e.message); }
         };
 
         window.editItem = (id) => {
@@ -258,43 +256,34 @@
             document.getElementById('item-name').value = item.name;
             document.getElementById('item-price').value = item.price;
             editId = id;
-            window.scrollTo(0, 0);
         };
 
         window.deleteItem = (id) => {
-            if(confirm("Hapus item ini?")) remove(ref(db, 'katalog/' + id));
+            if(confirm("Hapus item?")) remove(ref(db, 'katalog/' + id));
         };
 
         window.processOrder = async (id) => {
             const item = katalog.find(x => x.id === id);
-            const qtyInput = document.getElementById('qty-'+id);
-            const qty = parseInt(qtyInput.value);
-            const total = item.price * qty;
-
+            const qty = parseInt(document.getElementById('qty-'+id).value);
             try {
                 await push(ref(db, 'sales'), {
                     time: new Date().toLocaleString(),
                     detail: `${item.name} (${qty}x)`,
-                    total: total
+                    total: item.price * qty
                 });
-                alert(`Order ${item.name} berhasil!`);
-            } catch (e) { alert("Gagal order: " + e.message); }
+                alert("Order Berhasil!");
+            } catch (e) { alert(e.message); }
         };
 
-        // --- Render UI Functions ---
         function renderKatalog() {
             const body = document.getElementById('katalog-body');
             body.innerHTML = "";
             katalog.forEach(item => {
-                body.innerHTML += `
-                    <tr>
-                        <td>${item.name}</td>
-                        <td>Rp ${item.price.toLocaleString()}</td>
-                        <td>
-                            <button onclick="editItem('${item.id}')" style="width:auto; background:#f39c12; color:white">Edit</button>
-                            <button onclick="deleteItem('${item.id}')" style="width:auto; background:var(--danger); color:white">Hapus</button>
-                        </td>
-                    </tr>`;
+                const tr = document.createElement('tr');
+                tr.innerHTML = `<td>${item.name}</td><td>Rp ${item.price.toLocaleString()}</td>
+                    <td><button onclick="window.editItem('${item.id}')" style="width:auto; background:#f39c12; color:white">Edit</button>
+                    <button onclick="window.deleteItem('${item.id}')" style="width:auto; background:var(--danger); color:white">Hapus</button></td>`;
+                body.appendChild(tr);
             });
         }
 
@@ -302,40 +291,31 @@
             const grid = document.getElementById('order-grid');
             grid.innerHTML = "";
             katalog.forEach(item => {
-                grid.innerHTML += `
-                    <div class="product-card">
-                        <h4>${item.name}</h4>
-                        <p>Rp ${item.price.toLocaleString()}</p>
-                        <input type="number" id="qty-${item.id}" value="1" min="1" class="qty-input">
-                        <button class="btn-primary" onclick="processOrder('${item.id}')">Order</button>
-                    </div>`;
+                const div = document.createElement('div');
+                div.className = 'product-card';
+                div.innerHTML = `<h4>${item.name}</h4><p>Rp ${item.price.toLocaleString()}</p>
+                    <input type="number" id="qty-${item.id}" value="1" min="1" class="qty-input">
+                    <button class="btn-primary" onclick="window.processOrder('${item.id}')">Order</button>`;
+                grid.appendChild(div);
             });
         }
 
-        // --- Realtime Sync & Auth Observer ---
         onAuthStateChanged(auth, (user) => {
             if (user) {
                 document.getElementById('auth-page').classList.add('hidden');
                 document.getElementById('dashboard').classList.remove('hidden');
-                
-                // Sync Katalog
-                onValue(ref(db, 'katalog'), (snapshot) => {
-                    const data = snapshot.val();
-                    katalog = data ? Object.keys(data).map(key => ({ id: key, ...data[key] })) : [];
-                    renderKatalog();
-                    renderOrderGrid();
+                onValue(ref(db, 'katalog'), (snap) => {
+                    const data = snap.val();
+                    katalog = data ? Object.keys(data).map(k => ({id:k, ...data[k]})) : [];
+                    renderKatalog(); renderOrderGrid();
                 });
-
-                // Sync Sales
-                onValue(ref(db, 'sales'), (snapshot) => {
-                    const data = snapshot.val();
-                    const salesBody = document.getElementById('sales-body');
-                    salesBody.innerHTML = "";
-                    if(data) {
-                        Object.values(data).reverse().forEach(s => {
-                            salesBody.innerHTML += `<tr><td>${s.time}</td><td>${s.detail}</td><td>Rp ${s.total.toLocaleString()}</td></tr>`;
-                        });
-                    }
+                onValue(ref(db, 'sales'), (snap) => {
+                    const data = snap.val();
+                    const body = document.getElementById('sales-body');
+                    body.innerHTML = "";
+                    if(data) Object.values(data).reverse().forEach(s => {
+                        body.innerHTML += `<tr><td>${s.time}</td><td>${s.detail}</td><td>Rp ${s.total.toLocaleString()}</td></tr>`;
+                    });
                 });
             } else {
                 document.getElementById('auth-page').classList.remove('hidden');
