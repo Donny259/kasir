@@ -169,7 +169,6 @@
         const firebaseConfig = {
             apiKey: "AIzaSyBZU6qgOcXF5tRRmb41-WXdeQptMVfTPCU",
             authDomain: "kasir-d6127.firebaseapp.com",
-            // INI YANG TADI SALAH: Harus ada databaseURL karena server lo di Singapore
             databaseURL: "https://kasir-d6127-default-rtdb.asia-southeast1.firebasedatabase.app",
             projectId: "kasir-d6127",
             storageBucket: "kasir-d6127.firebasestorage.app",
@@ -184,6 +183,7 @@
 
         let katalog = [];
         let editId = null;
+        let currentUser = null;
 
         // --- Auth Functions ---
         window.toggleAuth = () => {
@@ -231,6 +231,7 @@
 
         // --- Core Logic ---
         window.addOrUpdateItem = async () => {
+            if(!currentUser) return;
             const name = document.getElementById('item-name').value;
             const priceVal = document.getElementById('item-price').value;
             if(!name || !priceVal) return alert("Isi data!");
@@ -238,11 +239,11 @@
 
             try {
                 if(editId) {
-                    await update(ref(db, 'katalog/' + editId), { name, price });
+                    await update(ref(db, `users/${currentUser.uid}/katalog/${editId}`), { name, price });
                     editId = null;
                     alert("Update Berhasil!");
                 } else {
-                    const newRef = push(ref(db, 'katalog'));
+                    const newRef = push(ref(db, `users/${currentUser.uid}/katalog`));
                     await set(newRef, { name, price });
                     alert("Simpan Berhasil!");
                 }
@@ -259,14 +260,16 @@
         };
 
         window.deleteItem = (id) => {
-            if(confirm("Hapus item?")) remove(ref(db, 'katalog/' + id));
+            if(!currentUser) return;
+            if(confirm("Hapus item?")) remove(ref(db, `users/${currentUser.uid}/katalog/${id}`));
         };
 
         window.processOrder = async (id) => {
+            if(!currentUser) return;
             const item = katalog.find(x => x.id === id);
             const qty = parseInt(document.getElementById('qty-'+id).value);
             try {
-                await push(ref(db, 'sales'), {
+                await push(ref(db, `users/${currentUser.uid}/sales`), {
                     time: new Date().toLocaleString(),
                     detail: `${item.name} (${qty}x)`,
                     total: item.price * qty
@@ -302,14 +305,19 @@
 
         onAuthStateChanged(auth, (user) => {
             if (user) {
+                currentUser = user;
                 document.getElementById('auth-page').classList.add('hidden');
                 document.getElementById('dashboard').classList.remove('hidden');
-                onValue(ref(db, 'katalog'), (snap) => {
+                
+                // Sinkronisasi Katalog spesifik User
+                onValue(ref(db, `users/${user.uid}/katalog`), (snap) => {
                     const data = snap.val();
                     katalog = data ? Object.keys(data).map(k => ({id:k, ...data[k]})) : [];
                     renderKatalog(); renderOrderGrid();
                 });
-                onValue(ref(db, 'sales'), (snap) => {
+                
+                // Sinkronisasi Sales spesifik User
+                onValue(ref(db, `users/${user.uid}/sales`), (snap) => {
                     const data = snap.val();
                     const body = document.getElementById('sales-body');
                     body.innerHTML = "";
@@ -318,6 +326,7 @@
                     });
                 });
             } else {
+                currentUser = null;
                 document.getElementById('auth-page').classList.remove('hidden');
                 document.getElementById('dashboard').classList.add('hidden');
             }
